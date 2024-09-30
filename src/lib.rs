@@ -1,4 +1,5 @@
 pub mod vec_deque_bools;
+pub mod bitstring;
 
 use std::{collections::VecDeque, ops::ControlFlow};
 
