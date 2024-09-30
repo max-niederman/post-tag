@@ -1,5 +1,3 @@
-use std::ops::ControlFlow;
-
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use post_tag::{vec_deque_bools::VecDequeBools, PostSystem};
 
@@ -8,9 +6,7 @@ fn bench_evolve_111010<S: PostSystem>() -> impl Fn(&mut Bencher) {
     move |b| {
         b.iter(|| {
             let mut system = S::new_decompressed(&compressed);
-            for _ in 0..2141 {
-                system.evolve();
-            }
+            system.evolve_multi(2141);
         });
     }
 }

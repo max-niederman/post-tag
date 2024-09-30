@@ -11,6 +11,50 @@ pub trait PostSystem: Clone {
 
     /// Evolve the system by one step, returning [`ControlFlow::Break`] if the system halts.
     fn evolve(&mut self) -> ControlFlow<()>;
+
+    const PREFERRED_TIMESTEP: u8 = 1;
+
+    /// Evolve the system by `n` steps.
+    ///
+    /// If the system halts, returns `Break(n)`, where `n` is the number of steps taken before halting.
+    fn evolve_multi(&mut self, n: usize) -> ControlFlow<usize> {
+        let (q, r) = (
+            n / Self::PREFERRED_TIMESTEP as usize,
+            n % Self::PREFERRED_TIMESTEP as usize,
+        );
+
+        for i in 0..q {
+            match self.evolve_preferred() {
+                ControlFlow::Break(j) => {
+                    return ControlFlow::Break(i * Self::PREFERRED_TIMESTEP as usize + j as usize)
+                }
+                ControlFlow::Continue(()) => {}
+            }
+        }
+
+        for j in 1..=r {
+            match self.evolve() {
+                ControlFlow::Break(()) => return ControlFlow::Break(q * Self::PREFERRED_TIMESTEP as usize + j),
+                ControlFlow::Continue(()) => {}
+            }
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    /// Evolve the system by [`Self::PREFFERED_TIMESTEP`] steps.
+    ///
+    /// If the system halts, returns `Break(n)`, where `n` is the number of steps taken before halting.
+    fn evolve_preferred(&mut self) -> ControlFlow<u8> {
+        for i in 1..=Self::PREFERRED_TIMESTEP {
+            match self.evolve() {
+                ControlFlow::Break(()) => return ControlFlow::Break(i),
+                ControlFlow::Continue(()) => {}
+            }
+        }
+
+        ControlFlow::Continue(())
+    }
 }
 
 #[cfg(test)]
