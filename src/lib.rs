@@ -7,54 +7,50 @@ pub trait PostSystem: Clone {
     /// Initialize the system from a compressed representation of an initial string.
     fn new_decompressed(compressed: &[bool]) -> Self;
 
+    /// Get the length of the system.
+    fn length(&self) -> usize;
+
     /// Convert the system to a canonical list form.
     fn as_list(&self) -> VecDeque<bool>;
 
     /// Evolve the system by one step, returning [`ControlFlow::Break`] if the system halts.
     fn evolve(&mut self) -> ControlFlow<()>;
 
-    const PREFERRED_TIMESTEP: u8 = 1;
-
     /// Evolve the system by `n` steps.
     ///
     /// If the system halts, returns `Break(n)`, where `n` is the number of steps taken before halting.
     fn evolve_multi(&mut self, n: usize) -> ControlFlow<usize> {
-        let (q, r) = (
-            n / Self::PREFERRED_TIMESTEP as usize,
-            n % Self::PREFERRED_TIMESTEP as usize,
-        );
+        let mut i = 0;
+        while i < n {
+            if self.length() >= 3 * Self::PREFERRED_TIMESTEP as usize {
+                self.evolve_preferred();
+                i += Self::PREFERRED_TIMESTEP as usize;
+            } else {
+                let res = self.evolve();
 
-        for i in 0..q {
-            match self.evolve_preferred() {
-                ControlFlow::Break(j) => {
-                    return ControlFlow::Break(i * Self::PREFERRED_TIMESTEP as usize + j as usize)
+                i += 1;
+
+                if let ControlFlow::Break(()) = res {
+                    return ControlFlow::Break(i);
                 }
-                ControlFlow::Continue(()) => {}
-            }
-        }
-
-        for j in 1..=r {
-            match self.evolve() {
-                ControlFlow::Break(()) => return ControlFlow::Break(q * Self::PREFERRED_TIMESTEP as usize + j),
-                ControlFlow::Continue(()) => {}
             }
         }
 
         ControlFlow::Continue(())
     }
 
+    /// The preferred number of steps to take when evolving the system.
+    const PREFERRED_TIMESTEP: u8 = 1;
+
     /// Evolve the system by [`Self::PREFFERED_TIMESTEP`] steps.
     ///
-    /// If the system halts, returns `Break(n)`, where `n` is the number of steps taken before halting.
-    fn evolve_preferred(&mut self) -> ControlFlow<u8> {
-        for i in 1..=Self::PREFERRED_TIMESTEP {
-            match self.evolve() {
-                ControlFlow::Break(()) => return ControlFlow::Break(i),
-                ControlFlow::Continue(()) => {}
-            }
-        }
+    /// The result of calling this on a system with length less than `3 * Self::PREFERRED_TIMESTEP` is undefined.
+    fn evolve_preferred(&mut self) {
+        debug_assert!(self.length() >= 3 * Self::PREFERRED_TIMESTEP as usize);
 
-        ControlFlow::Continue(())
+        for _ in 0..Self::PREFERRED_TIMESTEP {
+            self.evolve();
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{array, cmp::min, collections::VecDeque, ops::ControlFlow};
+use std::{array, collections::VecDeque, ops::ControlFlow};
 
 use crate::PostSystem;
 
@@ -23,11 +23,6 @@ impl BitString {
             start: 0,
             end: 0,
         }
-    }
-
-    /// Get the number of bits in the bit string.
-    fn length(&self) -> usize {
-        (self.words.len() - 1) * usize::BITS as usize + self.end as usize - self.start as usize
     }
 
     /// Append `count` bits to the end of the bit string, from the little-endian `bits`.
@@ -102,6 +97,10 @@ impl PostSystem for BitString {
         this
     }
 
+    fn length(&self) -> usize {
+        (self.words.len() - 1) * usize::BITS as usize + self.end as usize - self.start as usize
+    }
+
     fn as_list(&self) -> VecDeque<bool> {
         let mut list: VecDeque<_> = self
             .words
@@ -135,17 +134,10 @@ impl PostSystem for BitString {
         ControlFlow::Continue(())
     }
 
-    const PREFERRED_TIMESTEP: u8 = 10;
+    const PREFERRED_TIMESTEP: u8 = 11;
 
-    fn evolve_preferred(&mut self) -> ControlFlow<u8> {
-        if self.length() < 3 * Self::PREFERRED_TIMESTEP as usize {
-            for i in 1..=Self::PREFERRED_TIMESTEP {
-                match self.evolve() {
-                    ControlFlow::Break(()) => return ControlFlow::Break(i),
-                    ControlFlow::Continue(()) => {}
-                }
-            }
-        }
+    fn evolve_preferred(&mut self) {
+        debug_assert!(self.length() >= 3 * Self::PREFERRED_TIMESTEP as usize);
 
         let deleted = self.delete(3 * Self::PREFERRED_TIMESTEP);
 
@@ -159,8 +151,6 @@ impl PostSystem for BitString {
         let len = (lut_entry >> 48) as u8;
 
         self.append(bits, len);
-
-        ControlFlow::Continue(())
     }
 }
 

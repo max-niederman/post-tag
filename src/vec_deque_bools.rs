@@ -10,6 +10,10 @@ impl PostSystem for VecDequeBools {
         Self(compressed.iter().flat_map(|&b| [b, false, false]).collect())
     }
 
+    fn length(&self) -> usize {
+        self.0.len()
+    }
+
     fn as_list(&self) -> VecDeque<bool> {
         self.0.clone()
     }
