@@ -67,8 +67,13 @@ impl BitString {
             self.start %= usize::BITS as u8;
 
             self.words.pop_front().unwrap();
-            if self.words.len() == 1 && self.start > self.end {
+            if self.words.len() <= 1 && self.start > self.end {
                 self.end = self.start;
+            }
+            if self.words.is_empty() {
+                self.words.push_back(0);
+                self.start = 0;
+                self.end = 0;
             }
 
             *self.words.front_mut().unwrap() << (count - self.start)
@@ -130,7 +135,7 @@ impl PostSystem for BitString {
         ControlFlow::Continue(())
     }
 
-    const PREFERRED_TIMESTEP: u8 = 4;
+    const PREFERRED_TIMESTEP: u8 = 10;
 
     fn evolve_preferred(&mut self) -> ControlFlow<u8> {
         if self.length() < 3 * Self::PREFERRED_TIMESTEP as usize {
@@ -143,32 +148,34 @@ impl PostSystem for BitString {
         }
 
         let deleted = self.delete(3 * Self::PREFERRED_TIMESTEP);
-        let truncated = deleted & (1 << (3 * Self::PREFERRED_TIMESTEP - 2)) - 1;
 
-        let lut_entry = LUT.with(|lut| lut[truncated]);
+        let mut key = 0;
+        for i in 0..Self::PREFERRED_TIMESTEP {
+            key |= ((deleted >> (3 * i)) & 1) << i;
+        }
 
-        let bits = lut_entry & u16::MAX as u32;
-        let len = lut_entry >> 16;
+        let lut_entry = LUT.with(|lut| lut[key]);
+        let bits = (lut_entry & 0xFFFF_FFFF_FFFF) as usize;
+        let len = (lut_entry >> 48) as u8;
 
-        self.append(bits as _, len as _);
+        self.append(bits, len);
 
         ControlFlow::Continue(())
     }
 }
 
 thread_local! {
-    /// A lookup table for bit strings of length `3 * BitString::PREFERRED_TIMESTEP`.
-    /// The highest two bits must be zero, to reduce the LUT size.
+    /// A lookup table for bit strings of length `3 * BitString::PREFERRED_TIMESTEP` = `3 * 10`.
     ///
-    /// The result is a `u32` with the lower 16 bits containing the bits to append,
+    /// The result is a `u64` with the lower 48 bits containing the bits to append,
     /// and the upper 16 bits containing the number of bits to append.
-    static LUT: [u32; const { 1 << (3 * BitString::PREFERRED_TIMESTEP - 2) }] = {
-        array::from_fn(|mut key| {
-            let mut bits: u32 = 0;
-            let mut len: u32 = 0;
+    static LUT: [u64; const { 1 << BitString::PREFERRED_TIMESTEP }] = {
+        array::from_fn(|key| {
+            let mut bits: u64 = 0;
+            let mut len: u64 = 0;
 
-            for _ in 0..BitString::PREFERRED_TIMESTEP {
-                match key & 1 {
+            for i in 0..BitString::PREFERRED_TIMESTEP {
+                match (key >> i) & 1 {
                     0 => len += 2,
                     1 => {
                         bits |= 0b1011 << len;
@@ -176,11 +183,9 @@ thread_local! {
                     }
                     _ => unreachable!(),
                 }
-
-                key = key >> 3;
             }
 
-            bits | (len << 16)
+            bits | (len << 48)
         })
     };
 }
