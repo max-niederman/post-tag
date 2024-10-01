@@ -1,4 +1,4 @@
-use std::{array, collections::VecDeque, ops::ControlFlow};
+use std::{array, cmp::min, collections::VecDeque, ops::ControlFlow};
 
 use crate::PostSystem;
 
@@ -139,7 +139,7 @@ impl PostSystem for BitString {
 
     fn evolve_preferred(&mut self) -> ControlFlow<u8> {
         if self.length() < 3 * Self::PREFERRED_TIMESTEP as usize {
-            for i in 1..=(self.length() as _) {
+            for i in 1..=Self::PREFERRED_TIMESTEP {
                 match self.evolve() {
                     ControlFlow::Break(()) => return ControlFlow::Break(i),
                     ControlFlow::Continue(()) => {}
