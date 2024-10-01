@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, ops::ControlFlow};
+use std::{collections::VecDeque, hint::unreachable_unchecked, ops::ControlFlow};
 
 use crate::PostSystem;
 
@@ -25,8 +25,13 @@ impl BitString {
         }
     }
 
+    /// Get the number of bits in the bit string.
+    fn length(&self) -> usize {
+        (self.words.len() - 1) * usize::BITS as usize + self.end as usize - self.start as usize
+    }
+
     /// Append `count` bits to the end of the bit string, from the little-endian `bits`.
-    /// 
+    ///
     /// `count` must be at most `usize::BITS`.
     fn append(&mut self, bits: usize, count: u8) {
         debug_assert!(count <= usize::BITS as u8);
@@ -83,7 +88,7 @@ impl PostSystem for BitString {
             this.append(
                 match b {
                     false => 0b000,
-                    true => 0b100,
+                    true => 0b001,
                 },
                 3,
             );
@@ -110,7 +115,19 @@ impl PostSystem for BitString {
     }
 
     fn evolve(&mut self) -> ControlFlow<()> {
-        todo!()
+        if self.length() < 3 {
+            return ControlFlow::Break(());
+        }
+
+        let deleted = self.delete(3);
+
+        match deleted & 1 {
+            0 => self.append(0b00, 2),
+            1 => self.append(0b1011, 4),
+            _ => unsafe { unreachable_unchecked() },
+        }
+
+        ControlFlow::Continue(())
     }
 }
 
@@ -145,7 +162,10 @@ mod tests {
         );
 
         bit_string.append(usize::MAX, usize::BITS as u8);
-        assert_eq!(bit_string.as_list().make_contiguous().len(), (usize::BITS + 7) as _);
+        assert_eq!(
+            bit_string.as_list().make_contiguous().len(),
+            (usize::BITS + 7) as _
+        );
     }
 
     #[test]
@@ -158,5 +178,17 @@ mod tests {
         assert_eq!(bit_string.delete(64), 0x0FAA_AAAA_AAAA_AAAA);
 
         assert_eq!(bit_string.as_list().make_contiguous(), []);
+    }
+
+    #[test]
+    fn gets_length() {
+        let mut bit_string = BitString::new();
+        for l in 0..usize::BITS * 4 {
+            assert_eq!(bit_string.length(), l as _);
+            bit_string.append(0, 1);
+        }
+
+        bit_string.delete(7);
+        assert_eq!(bit_string.length(), usize::BITS as usize * 4 - 7);
     }
 }
