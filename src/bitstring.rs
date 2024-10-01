@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, hint::unreachable_unchecked, ops::ControlFlow};
+use std::{array, collections::VecDeque, ops::ControlFlow};
 
 use crate::PostSystem;
 
@@ -124,11 +124,65 @@ impl PostSystem for BitString {
         match deleted & 1 {
             0 => self.append(0b00, 2),
             1 => self.append(0b1011, 4),
-            _ => unsafe { unreachable_unchecked() },
+            _ => unreachable!(),
         }
 
         ControlFlow::Continue(())
     }
+
+    const PREFERRED_TIMESTEP: u8 = 4;
+
+    fn evolve_preferred(&mut self) -> ControlFlow<u8> {
+        if self.length() < 3 * Self::PREFERRED_TIMESTEP as usize {
+            for i in 1..=(self.length() as _) {
+                match self.evolve() {
+                    ControlFlow::Break(()) => return ControlFlow::Break(i),
+                    ControlFlow::Continue(()) => {}
+                }
+            }
+        }
+
+        let deleted = self.delete(3 * Self::PREFERRED_TIMESTEP);
+        let truncated = deleted & (1 << (3 * Self::PREFERRED_TIMESTEP - 2)) - 1;
+
+        let lut_entry = LUT.with(|lut| lut[truncated]);
+
+        let bits = lut_entry & u16::MAX as u32;
+        let len = lut_entry >> 16;
+
+        self.append(bits as _, len as _);
+
+        ControlFlow::Continue(())
+    }
+}
+
+thread_local! {
+    /// A lookup table for bit strings of length `3 * BitString::PREFERRED_TIMESTEP`.
+    /// The highest two bits must be zero, to reduce the LUT size.
+    ///
+    /// The result is a `u32` with the lower 16 bits containing the bits to append,
+    /// and the upper 16 bits containing the number of bits to append.
+    static LUT: [u32; const { 1 << (3 * BitString::PREFERRED_TIMESTEP - 2) }] = {
+        array::from_fn(|mut key| {
+            let mut bits: u32 = 0;
+            let mut len: u32 = 0;
+
+            for _ in 0..BitString::PREFERRED_TIMESTEP {
+                match key & 1 {
+                    0 => len += 2,
+                    1 => {
+                        bits |= 0b1011 << len;
+                        len += 4;
+                    }
+                    _ => unreachable!(),
+                }
+
+                key = key >> 3;
+            }
+
+            bits | (len << 16)
+        })
+    };
 }
 
 #[cfg(test)]
