@@ -23,9 +23,8 @@ fn bench_floyd_5854<S: PostSystem>() -> impl Fn(&mut Bencher) {
             let mut hare = tortoise.clone();
 
             loop {
-                tortoise.evolve();
-                hare.evolve();
-                hare.evolve();
+                tortoise.evolve_multi(S::PREFERRED_TIMESTEP as _);
+                hare.evolve_multi(S::PREFERRED_TIMESTEP as usize + 1);
 
                 if tortoise == hare {
                     break;
