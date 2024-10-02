@@ -13,6 +13,9 @@ pub struct BitString {
     start: u8,
     /// The index of the last bit in the last word.
     end: u8,
+
+    /// Length of the bit string.
+    len: usize,
 }
 
 impl BitString {
@@ -22,12 +25,13 @@ impl BitString {
             words: [0].into_iter().collect(),
             start: 0,
             end: 0,
+            len: 0,
         }
     }
 
     /// Append `count` bits to the end of the bit string, from the little-endian `bits`.
     ///
-    /// `count` must be at most `usize::BITS`.
+    /// `count` must be at most `usize::BITS`, and `bits` must not have any bits set beyond the `count`-th bit.
     fn append(&mut self, bits: usize, count: u8) {
         debug_assert!(count <= usize::BITS as u8);
 
@@ -44,6 +48,8 @@ impl BitString {
 
             self.words.push_back(rotated & upper_mask);
         }
+
+        self.len += count as usize;
     }
 
     /// Delete `count` bits from the start of the bit string, returning them.
@@ -76,7 +82,11 @@ impl BitString {
             0
         };
 
-        (lower | upper) & mask
+        let ret = (lower | upper) & mask;
+
+        self.len -= count as usize;
+
+        ret
     }
 }
 
@@ -133,7 +143,7 @@ impl PostSystem for BitString {
     }
 
     fn length(&self) -> usize {
-        (self.words.len() - 1) * usize::BITS as usize + self.end as usize - self.start as usize
+        self.len
     }
 
     fn as_list(&self) -> VecDeque<bool> {
