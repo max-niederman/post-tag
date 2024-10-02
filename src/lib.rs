@@ -3,7 +3,7 @@ pub mod bitstring;
 
 use std::{collections::VecDeque, ops::ControlFlow};
 
-pub trait PostSystem: Clone {
+pub trait PostSystem: Clone + Eq {
     /// Initialize the system from a compressed representation of an initial string.
     fn new_decompressed(compressed: &[bool]) -> Self;
 

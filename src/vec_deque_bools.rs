@@ -2,7 +2,7 @@ use std::{collections::VecDeque, ops::ControlFlow};
 
 use crate::PostSystem;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VecDequeBools(VecDeque<bool>);
 
 impl PostSystem for VecDequeBools {

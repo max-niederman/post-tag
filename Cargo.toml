@@ -7,5 +7,5 @@ edition = "2021"
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
-name = "evolution"
+name = "systems"
 harness = false

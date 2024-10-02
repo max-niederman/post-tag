@@ -80,6 +80,41 @@ impl BitString {
     }
 }
 
+impl PartialEq for BitString {
+    fn eq(&self, other: &Self) -> bool {
+        if self.length() != other.length() {
+            return false;
+        }
+
+        if self.start > other.start {
+            return other.eq(self);
+        }
+
+        let offset = other.start - self.start;
+        let overflow_mask = (1 << offset) - 1;
+
+        // Bits which overflowed from the previous self word, to be compared with the next other word.
+        let mut overflowed = other.words.front().unwrap() & overflow_mask;
+
+        for (&self_word, &other_word) in self.words.iter().zip(other.words.iter()) {
+            let rotated = self_word.rotate_left(offset as u32);
+            if overflowed | (rotated & !overflow_mask) != other_word {
+                return false;
+            }
+            overflowed = rotated & overflow_mask;
+        }
+
+        if other.words.len() > self.words.len()
+            && other.words.back().unwrap() & overflow_mask != overflowed
+        {
+            return false;
+        }
+
+        true
+    }
+}
+impl Eq for BitString {}
+
 impl PostSystem for BitString {
     fn new_decompressed(compressed: &[bool]) -> Self {
         let mut this = Self::new();
@@ -189,6 +224,55 @@ mod tests {
     use super::*;
 
     tests_for_system!(BitString);
+
+    #[test]
+    fn tests_equality() {
+        let mut bit_string = BitString::new();
+        let mut other = BitString::new();
+
+        assert_eq!(bit_string, other);
+
+        bit_string.append(0b101, 3);
+        assert_ne!(bit_string, other);
+
+        other.append(0b101, 3);
+        assert_eq!(bit_string, other);
+
+        bit_string.append(0b010, 3);
+        assert_ne!(bit_string, other);
+
+        other.append(0b010, 3);
+        assert_eq!(bit_string, other);
+
+        bit_string.append(0b0, 1);
+        assert_ne!(bit_string, other);
+
+        other.append(0b0, 1);
+        assert_eq!(bit_string, other);
+
+        bit_string.append(usize::MAX, usize::BITS as u8);
+        assert_ne!(bit_string, other);
+
+        other.append(usize::MAX, usize::BITS as u8);
+        assert_eq!(bit_string, other);
+
+        let mut bit_string = BitString::new();
+        let mut other = BitString::new();
+
+        bit_string.append(0b1010, 4);
+        other.append(0b10, 2);
+        assert_ne!(bit_string, other);
+
+        bit_string.delete(2);
+        assert_eq!(bit_string, other);
+
+        bit_string.append(usize::MAX, usize::BITS as u8);
+        other.append(usize::MAX, usize::BITS as u8);
+        assert_eq!(bit_string, other);
+
+        bit_string.append(0b1010, 4);
+        assert_ne!(bit_string, other);
+    }
 
     #[test]
     fn appends() {
