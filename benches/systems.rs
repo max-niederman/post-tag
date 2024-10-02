@@ -1,5 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
-use post_tag::{bitstring::BitString, vec_deque_bools::VecDequeBools, PostSystem};
+use post_tag::{
+    system::{BitString, VecDequeBools},
+    PostSystem,
+};
 
 fn bench_evolve_5854<S: PostSystem>() -> impl Fn(&mut Bencher) {
     let compressed = black_box([
